@@ -11,6 +11,9 @@ export type Message = {
     file_type: string | null;
     file_size: number | null;
     is_audio: boolean;
+    parent_id?: number | null;
+    parent?: Message | null;
+    is_forwarded?: boolean;
     created_at: string;
     updated_at: string;
 };

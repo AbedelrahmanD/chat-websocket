@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { LogOut, MessageSquare, Search } from '@lucide/vue';
-import { useChat } from '@/composables/useChat';
-import { getInitials } from '@/lib/utils';
+import { useUsers } from '@/composables/useUsers';
+import { useMessages } from '@/composables/useMessages';
+import { getInitials, formatMessageTime } from '@/lib/utils';
+import ProfileModal from '@/components/ProfileModal.vue';
+
+const showProfileModal = ref(false);
 
 const {
     usersList,
@@ -10,16 +14,34 @@ const {
     selectedUser,
     onlineUsers,
     unreadCounts,
-    selectUser,
     logout
-} = useChat();
+} = useUsers();
+
+const { selectUser } = useMessages();
 
 const searchQuery = ref('');
 
 const filteredUsers = computed(() => {
-    return usersList.value.filter(user =>
+    const list = [...usersList.value].filter(user =>
         user.name.toLowerCase().includes(searchQuery.value.toLowerCase())
     );
+
+    return list.sort((a, b) => {
+        const isOnlineA = onlineUsers.value.includes(Number(a.id));
+        const isOnlineB = onlineUsers.value.includes(Number(b.id));
+
+        if (isOnlineA && !isOnlineB) return -1;
+        if (!isOnlineA && isOnlineB) return 1;
+
+        const timeA = a.latest_message ? new Date(a.latest_message.created_at).getTime() : 0;
+        const timeB = b.latest_message ? new Date(b.latest_message.created_at).getTime() : 0;
+
+        if (timeA !== timeB) {
+            return timeB - timeA;
+        }
+
+        return a.name.localeCompare(b.name);
+    });
 });
 </script>
 
@@ -44,13 +66,14 @@ const filteredUsers = computed(() => {
             </button>
         </div>
 
-        <div class="flex items-center space-x-3 border-b border-slate-200/40 bg-slate-50/50 p-4">
-            <div class="avatar-circle avatar-indigo">
-                {{ currentUser ? getInitials(currentUser.name) : 'U' }}
+        <div @click="showProfileModal = true" class="flex items-center space-x-3 border-b border-slate-200/40 bg-slate-50/50 p-4 hover:bg-zinc-100/50 cursor-pointer transition select-none">
+            <div class="avatar-circle avatar-indigo relative group">
+                <img v-if="currentUser?.avatar_url" :src="currentUser.avatar_url" class="h-full w-full object-cover rounded-xl" />
+                <span v-else>{{ currentUser ? getInitials(currentUser.name) : 'U' }}</span>
             </div>
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold text-slate-700 truncate">{{ currentUser?.name }}</p>
-                <p class="text-xs text-slate-400 truncate">{{ currentUser?.email }}</p>
+                <p class="text-[10px] text-slate-400 truncate">{{ currentUser?.email }}</p>
             </div>
         </div>
 
@@ -65,25 +88,48 @@ const filteredUsers = computed(() => {
 
         <div class="user-list">
             <div v-for="user in filteredUsers" :key="user.id" @click="selectUser(user)" class="sidebar-item"
-                :class="{ 'sidebar-item-active': selectedUser?.id === user.id }">
+                :class="{ 'sidebar-item-active': Number(selectedUser?.id) === Number(user.id) }">
                 <div class="avatar-circle"
-                    :class="selectedUser?.id === user.id ? 'avatar-active bg-indigo-600' : 'avatar-indigo'">
-                    {{ getInitials(user.name) }}
-                    <div class="online-dot" :class="onlineUsers.includes(user.id) ? 'bg-emerald-500' : 'bg-slate-300'">
+                    :class="Number(selectedUser?.id) === Number(user.id) ? 'avatar-active' : 'avatar-indigo'">
+                    <img v-if="user.avatar_url" :src="user.avatar_url" class="h-full w-full object-cover rounded-xl" />
+                    <span v-else>{{ getInitials(user.name) }}</span>
+                    <div class="online-dot" :class="onlineUsers.includes(Number(user.id)) ? 'bg-emerald-500' : 'bg-zinc-300'">
                     </div>
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold truncate"
-                            :class="selectedUser?.id === user.id ? 'text-indigo-900' : 'text-slate-800'">
+                        <h3 class="text-xs font-semibold truncate"
+                            :class="Number(selectedUser?.id) === Number(user.id) ? 'text-zinc-950' : 'text-zinc-800'">
                             {{ user.name }}
                         </h3>
-                        <span v-if="unreadCounts[user.id] > 0"
-                            class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[10px] font-bold text-white shadow-sm">
-                            {{ unreadCounts[user.id] }}
-                        </span>
+                        <div class="flex items-center space-x-1 shrink-0">
+                            <span v-if="user.latest_message" class="text-[8px] text-zinc-400 font-medium">
+                                {{ formatMessageTime(user.latest_message.created_at) }}
+                            </span>
+                            <span v-if="unreadCounts[user.id] > 0"
+                                class="inline-flex h-4 min-w-4 items-center justify-center rounded-md bg-blue-600 px-1 text-[8px] font-bold text-white shadow-xs">
+                                {{ unreadCounts[user.id] }}
+                            </span>
+                        </div>
                     </div>
-                    <p class="text-xs text-slate-400 truncate mt-0.5">Click to open chat history</p>
+                    <p class="text-[10px] text-zinc-400 truncate mt-0.5 leading-tight">
+                        <template v-if="user.latest_message">
+                            <span v-if="Number(user.latest_message.sender_id) === Number(currentUser?.id)" class="text-zinc-500 font-medium">You: </span>
+                            <span v-if="user.latest_message.is_audio" class="italic">
+                                🎤 Voice note
+                            </span>
+                            <span v-else-if="user.latest_message.file_path && user.latest_message.file_type?.startsWith('image/')" class="italic">
+                                📷 Photo
+                            </span>
+                            <span v-else-if="user.latest_message.file_path" class="italic">
+                                📁 File
+                            </span>
+                            <span v-else>{{ user.latest_message.body }}</span>
+                        </template>
+                        <template v-else>
+                            No messages yet
+                        </template>
+                    </p>
                 </div>
             </div>
 
@@ -92,4 +138,6 @@ const filteredUsers = computed(() => {
             </div>
         </div>
     </aside>
+
+    <ProfileModal v-if="showProfileModal && currentUser" :user="currentUser" @close="showProfileModal = false" />
 </template>

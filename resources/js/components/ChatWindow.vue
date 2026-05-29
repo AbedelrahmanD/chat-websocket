@@ -1,21 +1,34 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { ArrowLeft, Loader2, MessageSquare } from '@lucide/vue';
-import { useChat } from '@/composables/useChat';
+import { useUsers } from '@/composables/useUsers';
+import { useMessages } from '@/composables/useMessages';
 import MessageItem from '@/components/MessageItem.vue';
 import ChatInput from '@/components/ChatInput.vue';
+import ForwardModal from '@/components/ForwardModal.vue';
 import { getInitials } from '@/lib/utils';
+import type { Message } from '@/types/chat';
 
+const { selectedUser, onlineUsers } = useUsers();
 const {
-    selectedUser,
     messages,
     isLoadingMessages,
     isLoadingMore,
     otherUserIsTyping,
-    onlineUsers,
     messageContainerRef,
     handleScroll,
     backToConversations
-} = useChat();
+} = useMessages();
+
+const forwardMessageData = ref<Message | null>(null);
+
+const openForwardModal = (msg: Message) => {
+    forwardMessageData.value = msg;
+};
+
+const closeForwardModal = () => {
+    forwardMessageData.value = null;
+};
 </script>
 
 <template>
@@ -29,21 +42,22 @@ const {
                         <ArrowLeft class="h-4 w-4" />
                     </button>
                     <div class="avatar-circle avatar-indigo">
-                        {{ getInitials(selectedUser.name) }}
+                        <img v-if="selectedUser.avatar_url" :src="selectedUser.avatar_url" class="h-full w-full object-cover rounded-xl" />
+                        <span v-else>{{ getInitials(selectedUser.name) }}</span>
                     </div>
                     <div>
-                        <h2 class="text-sm font-bold text-slate-900">{{ selectedUser.name }}</h2>
+                        <h2 class="text-xs font-bold text-zinc-900 leading-tight">{{ selectedUser.name }}</h2>
                         <p v-if="otherUserIsTyping"
-                            class="text-xs text-indigo-600 font-semibold flex items-center mt-0.5 animate-pulse">
+                            class="text-[10px] text-blue-600 font-semibold flex items-center mt-0.5 animate-pulse">
                             {{ selectedUser.name }} is typing...
                         </p>
-                        <p v-else-if="onlineUsers.includes(selectedUser.id)"
-                            class="text-xs text-emerald-600 font-semibold flex items-center mt-0.5">
+                        <p v-else-if="onlineUsers.includes(Number(selectedUser.id))"
+                            class="text-[10px] text-emerald-600 font-semibold flex items-center mt-0.5">
                             <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
                             Active Now
                         </p>
-                        <p v-else class="text-xs text-slate-400 font-medium flex items-center mt-0.5">
-                            <span class="h-1.5 w-1.5 rounded-full bg-slate-300 mr-1.5"></span>
+                        <p v-else class="text-[10px] text-zinc-400 font-medium flex items-center mt-0.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-zinc-300 mr-1.5"></span>
                             Offline
                         </p>
                     </div>
@@ -66,7 +80,7 @@ const {
                     </div>
 
                     <div v-else class="space-y-4">
-                        <MessageItem v-for="message in messages" :key="message.id" :message="message" />
+                        <MessageItem v-for="message in messages" :key="message.id" :message="message" @forward="openForwardModal" />
                     </div>
                 </template>
             </div>
@@ -88,5 +102,6 @@ const {
                 </div>
             </div>
         </template>
+        <ForwardModal v-if="forwardMessageData" :message="forwardMessageData" @close="closeForwardModal" />
     </main>
 </template>

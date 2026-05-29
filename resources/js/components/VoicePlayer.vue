@@ -22,8 +22,8 @@ const initWaveSurfer = () => {
 
     wavesurfer = WaveSurfer.create({
         container: waveformContainer.value,
-        waveColor: props.isSent ? '#a5b4fc' : '#cbd5e1',
-        progressColor: props.isSent ? '#ffffff' : '#4f46e5',
+        waveColor: props.isSent ? 'rgba(255, 255, 255, 0.35)' : '#d4d4d8',
+        progressColor: props.isSent ? '#ffffff' : '#2563eb',
         cursorColor: 'transparent',
         barWidth: 3,
         barRadius: 3,
@@ -166,20 +166,20 @@ watch(() => props.src, () => {
 
 .play-btn-sent {
     background-color: #ffffff;
-    color: #4f46e5;
+    color: #18181b;
 }
 .play-btn-sent:hover {
     transform: scale(1.05);
-    background-color: #f8fafc;
+    background-color: #f4f4f5;
 }
 
 .play-btn-received {
-    background-color: #4f46e5;
+    background-color: #2563eb;
     color: #ffffff;
 }
 .play-btn-received:hover {
     transform: scale(1.05);
-    background-color: #4338ca;
+    background-color: #1d4ed8;
 }
 
 .waveform-container {
@@ -206,18 +206,18 @@ watch(() => props.src, () => {
 }
 
 .speed-btn-sent {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.15);
     color: #ffffff;
 }
 .speed-btn-sent:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.25);
 }
 
 .speed-btn-received {
-    background-color: #f1f5f9;
-    color: #475569;
+    background-color: #f4f4f5;
+    color: #71717a;
 }
 .speed-btn-received:hover {
-    background-color: #e2e8f0;
+    background-color: #e4e4e7;
 }
 </style>

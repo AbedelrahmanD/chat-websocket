@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -21,6 +22,8 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
+
+    Route::post('profile', [ProfileController::class, 'update'])->name('profile.update');
 
     Route::get('chat', [ChatController::class, 'index'])->name('chat');
     Route::get('chat/messages/{user}', [MessageController::class, 'index'])->name('messages.index');

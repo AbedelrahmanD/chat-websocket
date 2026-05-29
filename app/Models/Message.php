@@ -19,7 +19,9 @@ use App\Helpers\ChatHelper;
     'file_name',
     'file_type',
     'file_size',
-    'is_audio'
+    'is_audio',
+    'parent_id',
+    'is_forwarded'
 ])]
 class Message extends Model
 {
@@ -42,6 +44,8 @@ class Message extends Model
             'read_at' => 'datetime',
             'is_audio' => 'boolean',
             'file_size' => 'integer',
+            'is_forwarded' => 'boolean',
+            'parent_id' => 'integer',
         ];
     }
 
@@ -53,5 +57,10 @@ class Message extends Model
     public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'receiver_id');
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Message::class, 'parent_id');
     }
 }

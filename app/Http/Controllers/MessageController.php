@@ -36,6 +36,7 @@ class MessageController extends Controller
         }
 
         $messages = Message::where('conversation_id', $conversationId)
+            ->with('parent')
             ->orderBy('created_at', 'desc')
             ->cursorPaginate(30);
 
@@ -49,13 +50,20 @@ class MessageController extends Controller
             'body' => 'nullable|string|max:5000',
             'file' => 'nullable|file|max:10240',
             'is_audio' => 'nullable|boolean',
+            'parent_id' => 'nullable|exists:messages,id',
+            'file_path' => 'nullable|string',
+            'file_name' => 'nullable|string',
+            'file_type' => 'nullable|string',
+            'file_size' => 'nullable|integer',
+            'is_forwarded' => 'nullable|boolean',
         ]);
 
-        $filePath = null;
-        $fileName = null;
-        $fileType = null;
-        $fileSize = null;
+        $filePath = $data['file_path'] ?? null;
+        $fileName = $data['file_name'] ?? null;
+        $fileType = $data['file_type'] ?? null;
+        $fileSize = $data['file_size'] ?? null;
         $isAudio = filter_var($request->input('is_audio'), FILTER_VALIDATE_BOOLEAN);
+        $isForwarded = filter_var($request->input('is_forwarded'), FILTER_VALIDATE_BOOLEAN);
 
         if ($request->hasFile('file')) {
             $uploadedFile = $request->file('file');
@@ -74,7 +82,11 @@ class MessageController extends Controller
             'file_type' => $fileType,
             'file_size' => $fileSize,
             'is_audio' => $isAudio,
+            'parent_id' => $data['parent_id'] ?? null,
+            'is_forwarded' => $isForwarded,
         ]);
+
+        $message->load('parent');
 
         broadcast(new MessageSent($message))->toOthers();
 
@@ -94,6 +106,8 @@ class MessageController extends Controller
         $message->update([
             'body' => $data['body'],
         ]);
+
+        $message->load('parent');
 
         broadcast(new MessageUpdated($message))->toOthers();
 

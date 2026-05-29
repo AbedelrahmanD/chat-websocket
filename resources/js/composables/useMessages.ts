@@ -1,19 +1,12 @@
 import { ref, nextTick } from 'vue';
 import axios from 'axios';
-import { router } from '@inertiajs/vue3';
 import { echo } from '@/lib/echo';
 import { getConversationId } from '@/lib/utils';
-import type { User } from '@/types/auth';
 import type { Message, PaginatedMessagesResponse } from '@/types/chat';
+import type { User } from '@/types/auth';
+import { useUsers } from './useUsers';
 import { route } from 'ziggy-js';
 
-// Axios setup
-axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-
-// Shared global state across components (singleton store pattern)
-const usersList = ref<User[]>([]);
-const currentUser = ref<User | null>(null);
-const selectedUser = ref<User | null>(null);
 const messages = ref<Message[]>([]);
 const pagination = ref<{
     nextPageUrl: string | null;
@@ -23,57 +16,25 @@ const isLoadingMessages = ref(false);
 const isLoadingMore = ref(false);
 const otherUserIsTyping = ref(false);
 const activeChannelName = ref<string | null>(null);
-
-const onlineUsers = ref<number[]>([]);
-const unreadCounts = ref<Record<number, number>>({});
 const messageContainerRef = ref<HTMLDivElement | null>(null);
+const replyToMessage = ref<Message | null>(null);
 
-export function useChat() {
+export function useMessages() {
+    const {
+        currentUser,
+        selectedUser,
+        clearUnreadCount,
+        updateUserLatestMessage,
+        handleUserLatestMessageUpdate,
+        handleUserLatestMessageDelete,
+    } = useUsers();
+
     const scrollToBottom = (): void => {
         nextTick(() => {
             if (messageContainerRef.value) {
                 messageContainerRef.value.scrollTop = messageContainerRef.value.scrollHeight;
             }
         });
-    };
-
-    const init = (users: User[], loggedInUser: User | null): void => {
-        usersList.value = users;
-        currentUser.value = loggedInUser;
-
-        // Initialize unread counts
-        users.forEach(user => {
-            unreadCounts.value[user.id] = user.unread_count || 0;
-        });
-
-        // Listen to personal channel for new message notifications from other users
-        if (currentUser.value) {
-            echo.private(`App.Models.User.${currentUser.value.id}`)
-                .listen('MessageSent', (e: { message: Message }) => {
-                    if (!selectedUser.value || selectedUser.value.id !== e.message.sender_id) {
-                        const senderId = e.message.sender_id;
-                        if (unreadCounts.value[senderId] !== undefined) {
-                            unreadCounts.value[senderId]++;
-                        } else {
-                            unreadCounts.value[senderId] = 1;
-                        }
-                    }
-                });
-        }
-
-        // Join online presence channel
-        echo.join('online')
-            .here((users: { id: number }[]) => {
-                onlineUsers.value = users.map(u => u.id);
-            })
-            .joining((user: { id: number }) => {
-                if (!onlineUsers.value.includes(user.id)) {
-                    onlineUsers.value.push(user.id);
-                }
-            })
-            .leaving((user: { id: number }) => {
-                onlineUsers.value = onlineUsers.value.filter(id => id !== user.id);
-            });
     };
 
     const selectUser = async (user: User): Promise<void> => {
@@ -88,8 +49,7 @@ export function useChat() {
         otherUserIsTyping.value = false;
         isLoadingMessages.value = true;
 
-        // Clear local unread count for this user
-        unreadCounts.value[user.id] = 0;
+        clearUnreadCount(user.id);
 
         const currentUserId = currentUser.value?.id ?? 0;
         const otherUserId = user.id;
@@ -108,20 +68,20 @@ export function useChat() {
                     if (messages.value.findIndex(m => m.id === e.message.id) === -1) {
                         messages.value.push(e.message);
                         scrollToBottom();
+                        updateUserLatestMessage(e.message);
 
-                        // If we are actively viewing this chat, automatically mark incoming messages as read
-                        if (e.message.sender_id === selectedUser.value?.id) {
-                            axios.post(route('messages.read', selectedUser.value.id)).catch(err => {
+                        const currentSelectedUser = selectedUser.value;
+                        if (currentSelectedUser && Number(e.message.sender_id) === Number(currentSelectedUser.id)) {
+                            axios.post(route('messages.read', currentSelectedUser.id)).catch(err => {
                                 console.error('Failed to mark incoming message as read', err);
                             });
                         }
                     }
                 })
                 .listen('MessagesRead', (e: { conversationId: string; readerId: number; readAt: string }) => {
-                    // If the other user read our messages, update the read status of all our sent messages in real-time
-                    if (e.readerId === selectedUser.value?.id) {
+                    if (Number(e.readerId) === Number(selectedUser.value?.id)) {
                         messages.value.forEach(m => {
-                            if (m.sender_id === currentUser.value?.id) {
+                            if (Number(m.sender_id) === Number(currentUser.value?.id)) {
                                 m.read_at = e.readAt;
                             }
                         });
@@ -132,12 +92,16 @@ export function useChat() {
                     if (index !== -1) {
                         messages.value[index] = e.message;
                     }
+                    handleUserLatestMessageUpdate(e.message);
                 })
                 .listen('MessageDeleted', (e: { messageId: number }) => {
                     messages.value = messages.value.filter(m => m.id !== e.messageId);
+                    if (selectedUser.value) {
+                        handleUserLatestMessageDelete(e.messageId, selectedUser.value.id);
+                    }
                 })
                 .listen('UserTyping', (e: { userId: number; isTyping: boolean }) => {
-                    if (e.userId === selectedUser.value?.id) {
+                    if (Number(e.userId) === Number(selectedUser.value?.id)) {
                         otherUserIsTyping.value = e.isTyping;
                     }
                 });
@@ -195,13 +159,16 @@ export function useChat() {
         }
     };
 
-    const sendMessageText = async (body: string): Promise<void> => {
+    const sendMessageText = async (body: string, parentId?: number): Promise<void> => {
         if (!selectedUser.value || !body) return;
 
         try {
             const formData = new FormData();
             formData.append('receiver_id', selectedUser.value.id.toString());
             formData.append('body', body);
+            if (parentId) {
+                formData.append('parent_id', parentId.toString());
+            }
 
             const response = await axios.post<Message>(route('messages.store'), formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
@@ -211,12 +178,13 @@ export function useChat() {
                 messages.value.push(response.data);
                 scrollToBottom();
             }
+            updateUserLatestMessage(response.data);
         } catch (error) {
             console.error(error);
         }
     };
 
-    const sendMessageFiles = async (files: File[], body?: string): Promise<void> => {
+    const sendMessageFiles = async (files: File[], body?: string, parentId?: number): Promise<void> => {
         if (!selectedUser.value || files.length === 0) return;
 
         try {
@@ -225,6 +193,9 @@ export function useChat() {
                 formData.append('receiver_id', selectedUser.value.id.toString());
                 if (i === 0 && body) {
                     formData.append('body', body);
+                }
+                if (i === 0 && parentId) {
+                    formData.append('parent_id', parentId.toString());
                 }
                 formData.append('file', files[i]);
 
@@ -236,13 +207,14 @@ export function useChat() {
                     messages.value.push(response.data);
                     scrollToBottom();
                 }
+                updateUserLatestMessage(response.data);
             }
         } catch (error) {
             console.error(error);
         }
     };
 
-    const sendMessageVoice = async (audioBlob: Blob): Promise<void> => {
+    const sendMessageVoice = async (audioBlob: Blob, parentId?: number): Promise<void> => {
         if (!selectedUser.value) return;
 
         try {
@@ -251,6 +223,9 @@ export function useChat() {
             formData.append('receiver_id', selectedUser.value.id.toString());
             formData.append('file', audioFile);
             formData.append('is_audio', '1');
+            if (parentId) {
+                formData.append('parent_id', parentId.toString());
+            }
 
             const response = await axios.post<Message>(route('messages.store'), formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
@@ -260,6 +235,7 @@ export function useChat() {
                 messages.value.push(response.data);
                 scrollToBottom();
             }
+            updateUserLatestMessage(response.data);
         } catch (error) {
             console.error(error);
         }
@@ -274,6 +250,7 @@ export function useChat() {
             if (index !== -1) {
                 messages.value[index] = response.data;
             }
+            handleUserLatestMessageUpdate(response.data);
         } catch (error) {
             console.error(error);
             throw error;
@@ -284,49 +261,76 @@ export function useChat() {
         try {
             await axios.delete(route('messages.destroy', messageId));
             messages.value = messages.value.filter(m => m.id !== messageId);
+            if (selectedUser.value) {
+                handleUserLatestMessageDelete(messageId, selectedUser.value.id);
+            }
         } catch (error) {
             console.error(error);
             throw error;
         }
     };
 
-    const logout = (): void => {
-        router.post(route('logout'));
+    const forwardMessage = async (message: Message, targetUserId: number): Promise<void> => {
+        try {
+            const formData = new FormData();
+            formData.append('receiver_id', targetUserId.toString());
+            if (message.body) {
+                formData.append('body', message.body);
+            }
+            if (message.file_path) {
+                formData.append('file_path', message.file_path);
+            }
+            if (message.file_name) {
+                formData.append('file_name', message.file_name);
+            }
+            if (message.file_type) {
+                formData.append('file_type', message.file_type);
+            }
+            if (message.file_size) {
+                formData.append('file_size', message.file_size.toString());
+            }
+            if (message.is_audio) {
+                formData.append('is_audio', '1');
+            }
+            formData.append('is_forwarded', '1');
+
+            const response = await axios.post<Message>(route('messages.store'), formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            if (selectedUser.value && Number(selectedUser.value.id) === Number(targetUserId)) {
+                if (messages.value.findIndex(m => m.id === response.data.id) === -1) {
+                    messages.value.push(response.data);
+                    scrollToBottom();
+                }
+            }
+            updateUserLatestMessage(response.data);
+        } catch (error) {
+            console.error('Failed to forward message', error);
+            throw error;
+        }
     };
 
-    const cleanup = (): void => {
+    const cleanupMessages = (): void => {
         if (activeChannelName.value) {
             echo.leave(activeChannelName.value);
             activeChannelName.value = null;
         }
-        if (currentUser.value) {
-            echo.leave(`App.Models.User.${currentUser.value.id}`);
-        }
-        echo.leave('online');
-
-        // Clear state variables
-        usersList.value = [];
-        currentUser.value = null;
-        selectedUser.value = null;
         messages.value = [];
         pagination.value = null;
-        onlineUsers.value = [];
-        unreadCounts.value = {};
+        replyToMessage.value = null;
     };
 
     return {
-        usersList,
-        currentUser,
-        selectedUser,
         messages,
         pagination,
         isLoadingMessages,
         isLoadingMore,
         otherUserIsTyping,
-        onlineUsers,
-        unreadCounts,
+        activeChannelName,
         messageContainerRef,
-        init,
+        replyToMessage,
+        scrollToBottom,
         selectUser,
         backToConversations,
         handleScroll,
@@ -334,10 +338,9 @@ export function useChat() {
         sendMessageText,
         sendMessageFiles,
         sendMessageVoice,
+        forwardMessage,
         updateMessage,
         deleteMessage,
-        logout,
-        cleanup,
-        scrollToBottom,
+        cleanupMessages,
     };
 }
