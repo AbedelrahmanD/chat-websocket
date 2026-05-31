@@ -19,8 +19,17 @@ RUN apk add --no-cache \
     php-xmlwriter
 
 WORKDIR /app
+
+# Copy Composer from official image and install PHP dependencies first
+COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+# Install Node.js dependencies
 COPY package*.json ./
 RUN npm ci
+
+# Copy full source and build assets
 COPY . .
 RUN npm run build
 
