@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Message;
 use App\Models\User;
 use App\Helpers\ChatHelper;
+use App\Services\PushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -89,6 +90,22 @@ class MessageController extends Controller
         $message->load('parent');
 
         broadcast(new MessageSent($message))->toOthers();
+
+        // Send push notification if recipient is offline on WebSockets
+        $receiver = User::find($data['receiver_id']);
+        if ($receiver && !$receiver->isOnline()) {
+            $senderName = Auth::user()->name;
+            $notificationBody = $message->is_audio 
+                ? '🎤 Sent a voice note' 
+                : ($message->file_path ? '📁 Sent a file attachment' : $message->body);
+
+            PushService::sendNotification(
+                $receiver,
+                "New message from {$senderName}",
+                $notificationBody,
+                ['url' => '/chat']
+            );
+        }
 
         return response()->json($message, 201);
     }

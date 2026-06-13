@@ -39,7 +39,7 @@ button:disabled, [role="button"]:disabled {
 }
 
 .form-icon {
-    @apply h-5 w-5 text-slate-400 transition-colors duration-200;
+    @apply h-5 w-5 text-slate-400 transition-colors duration-200 shrink-0;
 }
 
 .form-input-wrapper:focus-within .form-icon {

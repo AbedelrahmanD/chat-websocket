@@ -5,11 +5,11 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome');
+    return redirect()->route('chat');
 })->name('home');
 
 Route::middleware('guest')->group(function () {
@@ -24,6 +24,10 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::post('profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::post('chat/push-subscriptions', [PushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
+    Route::delete('chat/push-subscriptions', [PushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
+    Route::post('chat/ping', [PushSubscriptionController::class, 'ping'])->name('chat.ping');
 
     Route::get('chat', [ChatController::class, 'index'])->name('chat');
     Route::get('chat/messages/{user}', [MessageController::class, 'index'])->name('messages.index');

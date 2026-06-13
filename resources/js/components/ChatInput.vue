@@ -242,18 +242,18 @@ onUnmounted(() => {
             <span class="recording-dot"></span>
             <span class="text-xs font-semibold flex-1">Recording ({{ formatDuration(recordingTime) }})</span>
             <button type="button" @click="cancelRecording"
-                class="inline-flex h-8 px-2.5 items-center justify-center rounded-lg border border-red-200 text-[10px] font-bold text-red-600 bg-white hover:bg-red-50 transition focus:outline-none">
+                class="inline-flex h-8 px-2.5 shrink-0 items-center justify-center rounded-lg border border-red-200 text-[10px] font-bold text-red-600 bg-white hover:bg-red-50 transition focus:outline-none">
                 Cancel
             </button>
             <button type="button" @click="stopRecording"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 transition focus:outline-none animate-pulse">
+                class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 transition focus:outline-none animate-pulse">
                 <Square class="h-3.5 w-3.5" />
             </button>
         </div>
 
         <div v-else>
             <!-- Reply Preview Banner -->
-            <div v-if="replyToMessage" 
+            <div v-if="replyToMessage"
                 class="flex items-center justify-between bg-zinc-50 border border-zinc-200 p-3 rounded-t-lg border-b-0 transition animate-in slide-in-from-bottom-2 duration-150">
                 <div class="border-l-2 border-blue-600/80 pl-3 text-left min-w-0">
                     <p class="text-[10px] font-bold text-blue-600 leading-tight">
@@ -261,26 +261,28 @@ onUnmounted(() => {
                     </p>
                     <p class="text-[11.5px] text-zinc-500 truncate mt-0.5 max-w-[280px] sm:max-w-md">
                         <span v-if="replyToMessage.is_audio" class="italic">🎤 Voice note</span>
-                        <span v-else-if="replyToMessage.file_path && replyToMessage.file_type?.startsWith('image/')" class="italic">📷 Photo</span>
+                        <span v-else-if="replyToMessage.file_path && replyToMessage.file_type?.startsWith('image/')"
+                            class="italic">📷 Photo</span>
                         <span v-else-if="replyToMessage.file_path" class="italic">📁 File</span>
                         <span v-else>{{ replyToMessage.body }}</span>
                     </p>
                 </div>
-                <button type="button" @click="replyToMessage = null" class="text-zinc-400 hover:text-zinc-600 transition focus:outline-none shrink-0 ml-4">
+                <button type="button" @click="replyToMessage = null"
+                    class="text-zinc-400 hover:text-zinc-600 transition focus:outline-none shrink-0 ml-4">
                     <X class="h-4 w-4" />
                 </button>
             </div>
 
-            <div v-if="selectedFiles.length > 0"
-                class="flex flex-col space-y-1.5 bg-zinc-50 border border-zinc-200 p-3"
+            <div v-if="selectedFiles.length > 0" class="flex flex-col space-y-1.5 bg-zinc-50 border border-zinc-200 p-3"
                 :class="replyToMessage ? 'border-t-0 border-b-0' : 'rounded-t-lg border-b-0'">
                 <div v-for="(file, idx) in selectedFiles" :key="idx" class="flex items-center justify-between">
                     <div class="flex items-center space-x-2 text-zinc-600">
-                        <FileText class="h-3.5 w-3.5 text-blue-600" />
-                        <span class="text-[11px] font-semibold truncate max-w-xs">{{ file.name }} ({{ formatFileSize(file.size) }})</span>
+                        <FileText class="h-3.5 w-3.5 text-blue-600" fill="none" />
+                        <span class="text-[11px] font-semibold truncate max-w-xs">{{ file.name }} ({{
+                            formatFileSize(file.size) }})</span>
                     </div>
                     <button type="button" @click="() => { selectedFiles.splice(idx, 1); }"
-                        class="text-zinc-400 hover:text-zinc-600 focus:outline-none">
+                        class="text-zinc-400 hover:text-zinc-600 focus:outline-none shrink-0">
                         <X class="h-3.5 w-3.5" />
                     </button>
                 </div>
@@ -289,7 +291,7 @@ onUnmounted(() => {
             <form @submit.prevent="handleSubmit" class="flex items-center space-x-2.5">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="handleFileChange" />
                 <button type="button" @click="triggerFileSelect"
-                    class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition focus:outline-none shadow-xs"
+                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition focus:outline-none shadow-xs"
                     title="Attach Files">
                     <Paperclip class="h-4 w-4" />
                 </button>
@@ -303,21 +305,20 @@ onUnmounted(() => {
                 <div class="relative shrink-0 flex items-center">
                     <button type="button" @click.stop="showEmojiPicker = !showEmojiPicker"
                         class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition focus:outline-none shadow-xs"
-                        :class="{ 'text-blue-600 border-blue-200 bg-blue-50/20': showEmojiPicker }"
-                        title="Add Emoji">
+                        :class="{ 'text-blue-600 border-blue-200 bg-blue-50/20': showEmojiPicker }" title="Add Emoji">
                         <Smile class="h-4.5 w-4.5" />
                     </button>
                     <EmojiPicker v-if="showEmojiPicker" @select="handleEmojiSelect" @close="showEmojiPicker = false" />
                 </div>
 
                 <button type="button" @click="startRecording"
-                    class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:bg-blue-50/50 hover:text-blue-600 hover:border-blue-200 transition focus:outline-none shadow-xs"
+                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:bg-blue-50/50 hover:text-blue-600 hover:border-blue-200 transition focus:outline-none shadow-xs"
                     title="Record Audio">
                     <Mic class="h-4 w-4" />
                 </button>
 
                 <button type="submit" :disabled="!newMessageBody.trim() && selectedFiles.length === 0"
-                    class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm hover:bg-blue-700 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm hover:bg-blue-700 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
                     <Send class="h-3.5 w-3.5" />
                 </button>
             </form>

@@ -32,8 +32,8 @@ const submit = (): void => {
         <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-2xl sm:p-10 animate-fade-in">
             <!-- Header -->
             <div class="mb-8 text-center">
-                <div class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/20">
-                    <Lock class="h-6 w-6" />
+                <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/25">
+                    <img src="/pwa-192x192.png" alt="App Logo" class="h-full w-full object-cover" />
                 </div>
                 <h1 class="mt-4 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Welcome Back</h1>
                 <p class="mt-2 text-sm text-slate-500">Sign in to your account to start chatting</p>

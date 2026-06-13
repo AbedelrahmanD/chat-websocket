@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { LogOut, MessageSquare, Search } from '@lucide/vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { LogOut, MessageSquare, Search, Bell, BellOff } from '@lucide/vue';
+import axios from 'axios';
 import { useUsers } from '@/composables/useUsers';
 import { useMessages } from '@/composables/useMessages';
 import { getInitials, formatMessageTime } from '@/lib/utils';
 import ProfileModal from '@/components/ProfileModal.vue';
+import { usePushNotifications } from '@/composables/usePushNotifications';
 
 const showProfileModal = ref(false);
 
@@ -16,6 +18,33 @@ const {
     unreadCounts,
     logout
 } = useUsers();
+
+const { isSupported, isSubscribed, checkSubscription, subscribe, unsubscribe } = usePushNotifications();
+
+let pingInterval: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+    checkSubscription();
+    const sendPing = (): void => {
+        axios.post('/chat/ping').catch(() => {});
+    };
+    sendPing();
+    pingInterval = setInterval(sendPing, 20000);
+});
+
+onUnmounted(() => {
+    if (pingInterval) {
+        clearInterval(pingInterval);
+    }
+});
+
+const togglePush = async (): Promise<void> => {
+    if (isSubscribed.value) {
+        await unsubscribe();
+    } else {
+        await subscribe();
+    }
+};
 
 const { selectUser } = useMessages();
 
@@ -49,9 +78,8 @@ const filteredUsers = computed(() => {
     <aside class="sidebar-container" :class="selectedUser ? 'hidden sm:flex' : 'flex'">
         <div class="flex h-16 items-center justify-between border-b border-slate-200/60 px-4">
             <div class="flex items-center space-x-2">
-                <div
-                    class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 shadow-md shadow-indigo-500/10">
-                    <MessageSquare class="h-4.5 w-4.5 text-white" />
+                <div class="h-9 w-9 rounded-xl overflow-hidden shadow-md shadow-indigo-500/10">
+                    <img src="/pwa-192x192.png" alt="Logo" class="h-full w-full object-cover" />
                 </div>
                 <span
                     class="text-md font-bold tracking-tight bg-gradient-to-r from-slate-950 to-slate-700 bg-clip-text text-transparent">
@@ -59,11 +87,21 @@ const filteredUsers = computed(() => {
                 </span>
             </div>
 
-            <button @click="logout"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/60 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition focus:outline-none"
-                title="Logout">
-                <LogOut class="h-4 w-4" />
-            </button>
+            <div class="flex items-center space-x-1.5">
+                <button v-if="isSupported" @click="togglePush"
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/60 bg-white transition focus:outline-none cursor-pointer"
+                    :class="isSubscribed ? 'text-violet-600 hover:bg-violet-50 hover:border-violet-200 shadow-sm' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'"
+                    :title="isSubscribed ? 'Disable Push Notifications' : 'Enable Push Notifications'">
+                    <Bell v-if="isSubscribed" class="h-4 w-4 fill-violet-600/10" />
+                    <BellOff v-else class="h-4 w-4" />
+                </button>
+
+                <button @click="logout"
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/60 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition focus:outline-none cursor-pointer"
+                    title="Logout">
+                    <LogOut class="h-4 w-4" />
+                </button>
+            </div>
         </div>
 
         <div @click="showProfileModal = true" class="flex items-center space-x-3 border-b border-slate-200/40 bg-slate-50/50 p-4 hover:bg-zinc-100/50 cursor-pointer transition select-none">
